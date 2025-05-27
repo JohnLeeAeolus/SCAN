@@ -8,12 +8,14 @@ import {
     Alert,
     ActivityIndicator,
     Linking,
+    ScrollView,
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, firestore } from '../firebase/config';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Checkbox component
 function Checkbox({ checked, onPress }: { checked: boolean; onPress: () => void }) {
@@ -96,75 +98,79 @@ export default function SignUpScreen({ navigation }: SignUpScreenProps) {
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.welcome}>Welcome</Text>
-            <Text style={styles.subtitle}>Create you account here!</Text>
-            <View style={styles.avatarContainer}>
-                <View style={styles.avatarCircle}>
-                    <Text style={styles.avatarInitials}>{initials || 'CC'}</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.container}>
+                    <Text style={styles.welcome}>Welcome</Text>
+                    <Text style={styles.subtitle}>Create you account here!</Text>
+                    <View style={styles.avatarContainer}>
+                        <View style={styles.avatarCircle}>
+                            <Text style={styles.avatarInitials}>{initials || 'CC'}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.label}>Full Name</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Enter your full name"
+                        value={fullName}
+                        onChangeText={setFullName}
+                        autoCapitalize="words"
+                    />
+                    <Text style={styles.label}>Email Address</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Enter your email"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                    <Text style={styles.label}>Password</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Create a password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+                    <Text style={styles.label}>Confirm Password</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Confirm password"
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        secureTextEntry
+                    />
+                    <View style={styles.termsRow}>
+                        <Checkbox checked={acceptTerms} onPress={() => setAcceptTerms((v) => !v)} />
+                        <Text style={styles.termsText}>
+                            I accept the app's{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/terms')}>Terms of Use</Text>
+                            {' '}and{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/privacy')}>Privacy Policy</Text>
+                            .
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.button, !isFormValid && styles.buttonDisabled]}
+                        onPress={handleSignUp}
+                        disabled={!isFormValid || loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Setup Account</Text>
+                        )}
+                    </TouchableOpacity>
+                    <Text style={styles.loginText}>
+                        Already have an account?{' '}
+                        <Text style={styles.loginLink} onPress={() => navigation.navigate('SignIn')}>
+                            Log in
+                        </Text>
+                    </Text>
                 </View>
-            </View>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter your full name"
-                value={fullName}
-                onChangeText={setFullName}
-                autoCapitalize="words"
-            />
-            <Text style={styles.label}>Email Address</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-            />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Create a password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-            />
-            <View style={styles.termsRow}>
-                <Checkbox checked={acceptTerms} onPress={() => setAcceptTerms((v) => !v)} />
-                <Text style={styles.termsText}>
-                    I accept the app's{' '}
-                    <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/terms')}>Terms of Use</Text>
-                    {' '}and{' '}
-                    <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/privacy')}>Privacy Policy</Text>
-                    .
-                </Text>
-            </View>
-            <TouchableOpacity
-                style={[styles.button, !isFormValid && styles.buttonDisabled]}
-                onPress={handleSignUp}
-                disabled={!isFormValid || loading}
-            >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Setup Account</Text>
-                )}
-            </TouchableOpacity>
-            <Text style={styles.loginText}>
-                Already have an account?{' '}
-                <Text style={styles.loginLink} onPress={() => navigation.navigate('SignIn')}>
-                    Log in
-                </Text>
-            </Text>
-        </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 

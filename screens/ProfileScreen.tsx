@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { auth, firestore } from '../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { updatePassword } from 'firebase/auth';
+import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const placeholderAvatar = 'https://ui-avatars.com/api/?name=User&background=7F5FFF&color=fff&size=128';
 
@@ -22,8 +25,6 @@ export default function ProfileScreen() {
     const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
 
     // Placeholder data for demo
-    const followers = 2500;
-    const following = 320;
     const bio =
         'Passionate designer and photographer sharing my creative journey. Exploring the intersection of art and technology. Love capturing moments that tell a story.';
     const socialLinks = [
@@ -65,95 +66,91 @@ export default function ProfileScreen() {
 
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-                <ActivityIndicator size="large" color="#7F5FFF" />
-            </View>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#7F5FFF" />
+                </View>
+            </SafeAreaView>
         );
     }
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: '#fff' }} contentContainerStyle={{ padding: 20 }}>
-            {/* Header Row */}
-            <View style={styles.headerRow}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconBtn}>
-                    <Ionicons name="arrow-back-outline" size={24} color="#222" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Profile</Text>
-                <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.headerIconBtn}>
-                    <Ionicons name="notifications-outline" size={24} color="#222" />
-                </TouchableOpacity>
-            </View>
-            {/* Modal Menu */}
-            <Modal
-                visible={modalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setModalVisible(false)}
-            >
-                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-                    <View style={styles.menuModal}>
-                        <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); }}>
-                            <Ionicons name="notifications-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                            <Text style={styles.menuText}>Notifications</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Dashboard'); }}>
-                            <Ionicons name="home-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                            <Text style={styles.menuText}>Go to Home</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Profile'); }}>
-                            <Ionicons name="settings-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                            <Text style={styles.menuText}>Go to Settings</Text>
-                        </TouchableOpacity>
-                    </View>
-                </TouchableOpacity>
-            </Modal>
-            {/* Profile Card */}
-            <View style={styles.profileCard}>
-                <Image source={{ uri: user?.profileImage || user?.avatar || placeholderAvatar }} style={styles.avatar} />
-                <Text style={styles.name}>{user?.fullName || user?.name || 'Jane Doe'}</Text>
-                <Text style={styles.username}>@{user?.username || 'janedoe'}</Text>
-                <View style={styles.divider} />
-                <View style={styles.statsRow}>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statValue}>{followers}</Text>
-                        <Text style={styles.statLabel}>Followers</Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <Text style={styles.statValue}>{following}</Text>
-                        <Text style={styles.statLabel}>Following</Text>
-                    </View>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                {/* Header Row */}
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconBtn}>
+                        <Ionicons name="arrow-back-outline" size={24} color="#222" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Profile</Text>
+                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.headerIconBtn}>
+                        <Ionicons name="notifications-outline" size={24} color="#222" />
+                    </TouchableOpacity>
                 </View>
-            </View>
-            {/* Bio Section */}
-            <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Bio</Text>
-                    <Ionicons name="chevron-forward-outline" size={18} color="#888" />
+                {/* Modal Menu */}
+                <Modal
+                    visible={modalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setModalVisible(false)}
+                >
+                    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
+                        <View style={styles.menuModal}>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); }}>
+                                <Ionicons name="notifications-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
+                                <Text style={styles.menuText}>Notifications</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Dashboard'); }}>
+                                <Ionicons name="home-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
+                                <Text style={styles.menuText}>Go to Home</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Profile'); }}>
+                                <Ionicons name="settings-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
+                                <Text style={styles.menuText}>Go to Settings</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+                {/* Profile Card */}
+                <View style={styles.profileCard}>
+                    <TouchableOpacity>
+                        <Image source={{ uri: user?.profileImage || user?.avatar || placeholderAvatar }} style={styles.avatar} />
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                        <Text style={styles.name}>{user?.fullName || user?.name || 'Jane Doe'}</Text>
+                    </View>
+                    <Text style={styles.username}>@{user?.username || 'janedoe'}</Text>
                 </View>
-                <Text style={styles.bioText}>{user?.bio || bio}</Text>
-            </View>
-            {/* Social Links */}
-            <Text style={styles.sectionTitle}>Social Links</Text>
-            <View style={styles.socialLinksRow}>
-                {socialLinks.map((link, idx) => (
-                    <View key={idx} style={[styles.socialLink, { backgroundColor: link.color }]}>
-                        {link.icon}
-                        <Text style={styles.socialLabel}>{link.label}</Text>
+                {/* Bio Section */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Bio</Text>
+                    </View>
+                    <Text style={styles.bioText}>{user?.bio || bio}</Text>
+                </View>
+                {/* Social Links */}
+                <Text style={styles.sectionTitle}>Social Links</Text>
+                <View style={styles.socialLinksRow}>
+                    {socialLinks.map((link, idx) => (
+                        <View key={idx} style={[styles.socialLink, { backgroundColor: link.color }]}>
+                            {link.icon}
+                            <Text style={styles.socialLabel}>{link.label}</Text>
+                        </View>
+                    ))}
+                </View>
+                {/* Achievements */}
+                <Text style={styles.sectionTitle}>Achievements</Text>
+                {achievements.map((ach, idx) => (
+                    <View key={idx} style={styles.achievementCard}>
+                        {ach.icon}
+                        <View style={{ marginLeft: 12 }}>
+                            <Text style={styles.achievementTitle}>{ach.title}</Text>
+                            <Text style={styles.achievementDesc}>{ach.desc}</Text>
+                        </View>
                     </View>
                 ))}
-            </View>
-            {/* Achievements */}
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            {achievements.map((ach, idx) => (
-                <View key={idx} style={styles.achievementCard}>
-                    {ach.icon}
-                    <View style={{ marginLeft: 12 }}>
-                        <Text style={styles.achievementTitle}>{ach.title}</Text>
-                        <Text style={styles.achievementDesc}>{ach.desc}</Text>
-                    </View>
-                </View>
-            ))}
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
@@ -235,24 +232,6 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#F0F0F0',
         marginVertical: 12,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-    },
-    statBox: {
-        alignItems: 'center',
-        flex: 1,
-    },
-    statValue: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#222',
-    },
-    statLabel: {
-        color: '#888',
-        fontSize: 13,
     },
     sectionCard: {
         backgroundColor: '#fff',

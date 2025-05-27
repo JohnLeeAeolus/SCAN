@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Platform,
     Linking,
+    ScrollView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
@@ -17,6 +18,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { auth, firestore } from '../firebase/config';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type SetupAccountScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SetupAccount'>;
@@ -84,84 +86,88 @@ export default function SetupAccountScreen({ navigation }: SetupAccountScreenPro
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Set up Account</Text>
-            <View style={styles.profileRow}>
-                <TouchableOpacity onPress={pickImage} style={styles.avatarWrapper}>
-                    {profileImage ? (
-                        <Image source={{ uri: profileImage }} style={styles.avatar} />
-                    ) : (
-                        <View style={styles.avatarPlaceholder}>
-                            <Text style={styles.avatarPlaceholderText}>+</Text>
-                        </View>
-                    )}
-                    <View style={styles.cameraIconWrapper}>
-                        <Text style={styles.cameraIcon}>📷</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.container}>
+                    <Text style={styles.title}>Set up Account</Text>
+                    <View style={styles.profileRow}>
+                        <TouchableOpacity onPress={pickImage} style={styles.avatarWrapper}>
+                            {profileImage ? (
+                                <Image source={{ uri: profileImage }} style={styles.avatar} />
+                            ) : (
+                                <View style={styles.avatarPlaceholder}>
+                                    <Text style={styles.avatarPlaceholderText}>+</Text>
+                                </View>
+                            )}
+                            <View style={styles.cameraIconWrapper}>
+                                <Text style={styles.cameraIcon}>📷</Text>
+                            </View>
+                        </TouchableOpacity>
+                        <Text style={styles.profileHint}>Tap the camera icon to upload a profile picture.</Text>
                     </View>
-                </TouchableOpacity>
-                <Text style={styles.profileHint}>Tap the camera icon to upload a profile picture.</Text>
-            </View>
-            <Text style={styles.sectionTitle}>Account Information</Text>
-            <Text style={styles.label}>Local Congregation</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Type your Local Congregation"
-                value={congregation}
-                onChangeText={setCongregation}
-            />
-            <Text style={styles.label}>Assigned Duties</Text>
-            <View style={styles.pickerWrapper}>
-                <Picker
-                    selectedValue={duty}
-                    onValueChange={setDuty}
-                    style={styles.picker}
-                >
-                    <Picker.Item label="Select your Duties" value="" />
-                    {DUTIES.map((d) => (
-                        <Picker.Item key={d} label={d} value={d} />
-                    ))}
-                </Picker>
-            </View>
-            <Text style={styles.label}>Call Sign</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Type your Call Sign"
-                value={callSign}
-                onChangeText={setCallSign}
-            />
-            <Text style={styles.label}>Username (Optional)</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Choose a username"
-                value={username}
-                onChangeText={setUsername}
-            />
-            <View style={styles.termsRow}>
-                <TouchableOpacity onPress={() => setAcceptTerms((v) => !v)} style={styles.checkboxContainer}>
-                    <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
-                        {acceptTerms && <View style={styles.checkboxInner} />}
+                    <Text style={styles.sectionTitle}>Account Information</Text>
+                    <Text style={styles.label}>Local Congregation</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Type your Local Congregation"
+                        value={congregation}
+                        onChangeText={setCongregation}
+                    />
+                    <Text style={styles.label}>Assigned Duties</Text>
+                    <View style={styles.pickerWrapper}>
+                        <Picker
+                            selectedValue={duty}
+                            onValueChange={setDuty}
+                            style={styles.picker}
+                        >
+                            <Picker.Item label="Select your Duties" value="" />
+                            {DUTIES.map((d) => (
+                                <Picker.Item key={d} label={d} value={d} />
+                            ))}
+                        </Picker>
                     </View>
-                </TouchableOpacity>
-                <Text style={styles.termsText}>
-                    I agree to the{' '}
-                    <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/terms')}>Terms of Service</Text>
-                    {' '}and{' '}
-                    <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/privacy')}>Privacy Policy</Text>
-                    .
-                </Text>
-            </View>
-            <TouchableOpacity
-                style={[styles.button, !isFormValid && styles.buttonDisabled]}
-                onPress={handleCreateAccount}
-                disabled={!isFormValid || loading}
-            >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Create Account</Text>
-                )}
-            </TouchableOpacity>
-        </View>
+                    <Text style={styles.label}>Call Sign</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Type your Call Sign"
+                        value={callSign}
+                        onChangeText={setCallSign}
+                    />
+                    <Text style={styles.label}>Username (Optional)</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Choose a username"
+                        value={username}
+                        onChangeText={setUsername}
+                    />
+                    <View style={styles.termsRow}>
+                        <TouchableOpacity onPress={() => setAcceptTerms((v) => !v)} style={styles.checkboxContainer}>
+                            <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
+                                {acceptTerms && <View style={styles.checkboxInner} />}
+                            </View>
+                        </TouchableOpacity>
+                        <Text style={styles.termsText}>
+                            I agree to the{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/terms')}>Terms of Service</Text>
+                            {' '}and{' '}
+                            <Text style={styles.link} onPress={() => Linking.openURL('https://yourapp.com/privacy')}>Privacy Policy</Text>
+                            .
+                        </Text>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.button, !isFormValid && styles.buttonDisabled]}
+                        onPress={handleCreateAccount}
+                        disabled={!isFormValid || loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Create Account</Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 

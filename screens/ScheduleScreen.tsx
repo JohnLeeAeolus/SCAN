@@ -7,6 +7,7 @@ import {
     ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type DutyStatus = 'Assigned' | 'Pending' | 'Swap Requested' | 'Completed';
 
@@ -145,18 +146,20 @@ export default function ScheduleScreen() {
     );
 
     return (
-        <View style={styles.root}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Duty Schedule</Text>
-                <Ionicons name="notifications-outline" size={24} color="#222" />
-            </View>
-            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-                <Text style={styles.sectionTitle}>This Week</Text>
-                {duties.filter(d => d.section === 'This Week').map(renderDutyCard)}
-                <Text style={styles.sectionTitle}>Next Week</Text>
-                {duties.filter(d => d.section === 'Next Week').map(renderDutyCard)}
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.root}>
+                    <View style={styles.header}>
+                        <Text style={styles.headerTitle}>Duty Schedule</Text>
+                        <Ionicons name="notifications-outline" size={24} color="#222" />
+                    </View>
+                    <Text style={styles.sectionTitle}>This Week</Text>
+                    {duties.filter(d => d.section === 'This Week').map(renderDutyCard)}
+                    <Text style={styles.sectionTitle}>Next Week</Text>
+                    {duties.filter(d => d.section === 'Next Week').map(renderDutyCard)}
+                </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }
 

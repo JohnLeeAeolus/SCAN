@@ -9,6 +9,13 @@ export type RootStackParamList = {
     SetupAccount: undefined;
     MainTabs: { screen?: string } | undefined;
     ProfileScreen: undefined;
+    Settings: undefined;
+    ChangeUsername: undefined;
+    ChangeAvatar: undefined;
+    ManageAccess: undefined;
+    NotificationFrequency: undefined;
+    ChangePassword: undefined;
+    LinkedDevices: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

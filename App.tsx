@@ -17,6 +17,13 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import type { RouteProp } from '@react-navigation/native';
 import ProfileScreen from './screens/ProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import ChangeUsernameScreen from './screens/ChangeUsernameScreen';
+import ChangeAvatarScreen from './screens/ChangeAvatarScreen';
+import ManageAccessScreen from './screens/ManageAccessScreen';
+import NotificationFrequencyScreen from './screens/NotificationFrequencyScreen';
+import ChangePasswordScreen from './screens/ChangePasswordScreen';
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -40,6 +47,8 @@ function MainTabs({ route }: { route?: { params?: { screen?: string } } }) {
                         return <Ionicons name="calendar-outline" size={size} color={color} />;
                     } else if (route.name === 'Profile') {
                         return <Ionicons name="person-outline" size={size} color={color} />;
+                    } else if (route.name === 'Settings') {
+                        return <Ionicons name="settings-outline" size={size} color={color} />;
                     }
                     return null;
                 },
@@ -49,6 +58,7 @@ function MainTabs({ route }: { route?: { params?: { screen?: string } } }) {
             <Tab.Screen name="DutySchedule" component={ScheduleScreen} options={{ title: 'Duty Schedule' }} />
             <Tab.Screen name="Events" component={ReportScreen} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
+            <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
         </Tab.Navigator>
     );
 }
@@ -90,6 +100,11 @@ export default function App() {
                         <>
                             <Stack.Screen name="MainTabs" component={MainTabs} />
                             <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+                            <Stack.Screen name="ChangeUsername" component={ChangeUsernameScreen} />
+                            <Stack.Screen name="ChangeAvatar" component={ChangeAvatarScreen} />
+                            <Stack.Screen name="ManageAccess" component={ManageAccessScreen} />
+                            <Stack.Screen name="NotificationFrequency" component={NotificationFrequencyScreen} />
+                            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
                         </>
                     )
                 ) : (

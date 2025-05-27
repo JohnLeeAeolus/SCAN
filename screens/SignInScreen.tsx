@@ -8,11 +8,13 @@ import {
     Alert,
     ActivityIndicator,
     Linking,
+    ScrollView,
 } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type SignInScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
@@ -52,70 +54,74 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
     };
 
     return (
-        <View style={styles.container}>
-            <View style={styles.avatarContainer}>
-                <View style={styles.avatarCircle}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.container}>
+                    <View style={styles.avatarContainer}>
+                        <View style={styles.avatarCircle}>
+                            <Text style={styles.avatarInitials}>{initials}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.title}>Log In</Text>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="m@example.com"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                    <Text style={styles.label}>Password</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="********"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry
+                    />
+                    <TouchableOpacity
+                        style={[styles.button, !isFormValid && styles.buttonDisabled]}
+                        onPress={handleSignIn}
+                        disabled={!isFormValid || loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.buttonText}>Continue</Text>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => Alert.alert('Reset Password', 'Password reset flow not implemented yet.')}
+                        style={styles.forgotPasswordBtn}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+                    </TouchableOpacity>
+                    <View style={styles.dividerRow}>
+                        <View style={styles.divider} />
+                        <Text style={styles.orText}>or</Text>
+                        <View style={styles.divider} />
+                    </View>
+                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Email')}>
+                        <Text style={styles.socialButtonText}>✉️  Continue with Email</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
+                        <Text style={styles.socialButtonText}>  Continue with Apple</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Youtube')}>
+                        <Text style={styles.socialButtonText}>▶️  Continue with Youtube</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Facebook')}>
+                        <Text style={styles.socialButtonText}>📘  Continue with Facebook</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.signupText}>
+                        Don't have an account?{' '}
+                        <Text style={styles.signupLink} onPress={() => navigation.navigate('SignUp')}>
+                            Sign up
+                        </Text>
+                    </Text>
                 </View>
-            </View>
-            <Text style={styles.title}>Log In</Text>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="m@example.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-            />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="********"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
-            <TouchableOpacity
-                style={[styles.button, !isFormValid && styles.buttonDisabled]}
-                onPress={handleSignIn}
-                disabled={!isFormValid || loading}
-            >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.buttonText}>Continue</Text>
-                )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => Alert.alert('Reset Password', 'Password reset flow not implemented yet.')}
-                style={styles.forgotPasswordBtn}
-            >
-                <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-            </TouchableOpacity>
-            <View style={styles.dividerRow}>
-                <View style={styles.divider} />
-                <Text style={styles.orText}>or</Text>
-                <View style={styles.divider} />
-            </View>
-            <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Email')}>
-                <Text style={styles.socialButtonText}>✉️  Continue with Email</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
-                <Text style={styles.socialButtonText}>  Continue with Apple</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Youtube')}>
-                <Text style={styles.socialButtonText}>▶️  Continue with Youtube</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Facebook')}>
-                <Text style={styles.socialButtonText}>📘  Continue with Facebook</Text>
-            </TouchableOpacity>
-            <Text style={styles.signupText}>
-                Don't have an account?{' '}
-                <Text style={styles.signupLink} onPress={() => navigation.navigate('SignUp')}>
-                    Sign up
-                </Text>
-            </Text>
-        </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 

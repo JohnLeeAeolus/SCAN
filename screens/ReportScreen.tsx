@@ -8,6 +8,7 @@ import {
     Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const events = [
     {
@@ -58,11 +59,11 @@ const announcements = [
 
 export default function ReportScreen() {
     return (
-        <View style={styles.root}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Events & Announcements</Text>
-            </View>
-            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Events & Announcements</Text>
+                </View>
                 <Text style={styles.sectionTitle}>Upcoming Events</Text>
                 {events.map(event => (
                     <View key={event.id} style={styles.eventCard}>
@@ -122,7 +123,7 @@ export default function ReportScreen() {
                     </View>
                 ))}
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }
 

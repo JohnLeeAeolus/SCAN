@@ -7,7 +7,8 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
-    Modal
+    Modal,
+    RefreshControl
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { auth, firestore } from '../firebase/config';
@@ -34,32 +35,42 @@ const events = [
 export default function HomeScreen() {
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [qrModalVisible, setQrModalVisible] = useState(false);
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const currentUser = auth.currentUser;
-                if (!currentUser) return;
-                const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
-                if (userDoc.exists()) {
-                    setUser(userDoc.data());
-                }
-            } catch (error) {
-                // Optionally handle error
-            } finally {
-                setLoading(false);
+    const fetchUser = async () => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
+            const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+                setUser(userDoc.data());
             }
-        };
+        } catch (error) {
+            console.error('Error fetching user:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUser();
+    }, []);
+
+    const onRefresh = React.useCallback(() => {
+        setRefreshing(true);
         fetchUser();
     }, []);
 
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-                <ActivityIndicator size="large" color="#7F5FFF" />
-            </View>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#7F5FFF" />
+                </View>
+            </SafeAreaView>
         );
     }
 
@@ -68,7 +79,18 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={{ padding: 20 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#7F5FFF']}
+                        tintColor="#7F5FFF"
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.headerTitle}>Dashboard</Text>

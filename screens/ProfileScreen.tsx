@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert, RefreshControl } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { auth, firestore } from '../firebase/config';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { updatePassword } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,51 +18,98 @@ type MainTabsParamList = {
     Profile: undefined;
 };
 
+type SocialLink = {
+    platform: string;
+    icon: string;
+    label: string;
+    color: string;
+};
+
+type Achievement = {
+    icon: string;
+    title: string;
+    desc: string;
+};
+
 export default function ProfileScreen() {
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
 
-    // Placeholder data for demo
-    const bio =
-        'Passionate designer and photographer sharing my creative journey. Exploring the intersection of art and technology. Love capturing moments that tell a story.';
-    const socialLinks = [
-        { icon: <FontAwesome name="twitter" size={16} color="#1DA1F2" />, label: '@janedoe_design', color: '#E6F4FD' },
-        { icon: <FontAwesome name="linkedin" size={16} color="#0A66C2" />, label: '/in/janedoecreative', color: '#E6F0FA' },
-        { icon: <MaterialCommunityIcons name="web" size={16} color="#A259FF" />, label: 'janedoe.design', color: '#F3E6FF' },
-        { icon: <FontAwesome5 name="github" size={16} color="#333" />, label: 'janedoe-dev', color: '#F0F0F0' },
-    ];
-    const achievements = [
-        {
-            icon: <Ionicons name="ribbon-outline" size={20} color="#7F5FFF" />,
-            title: 'Top Contributor',
-            desc: 'Recognized for outstanding contributions in the community.',
-        },
-        {
-            icon: <Ionicons name="bulb-outline" size={20} color="#7F5FFF" />,
-            title: 'Creative Pioneer',
-            desc: 'Awarded for innovative design work.',
-        },
-    ];
+    const fetchUser = async () => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
+            const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+                const data = userDoc.data();
+                setUser(data);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to fetch user data');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const currentUser = auth.currentUser;
-                if (!currentUser) return;
-                const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
-                if (userDoc.exists()) {
-                    setUser(userDoc.data());
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        // Set up real-time listener
+        const unsubscribe = onSnapshot(
+            doc(firestore, 'users', currentUser.uid),
+            (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    setUser(data);
                 }
-            } catch (error) {
-                // Optionally handle error
-            } finally {
+                setLoading(false);
+            },
+            (error) => {
+                console.error("Error listening to user data:", error);
+                Alert.alert('Error', 'Failed to sync user data');
                 setLoading(false);
             }
-        };
+        );
+
+        // Cleanup listener on unmount
+        return () => unsubscribe();
+    }, []);
+
+    const onRefresh = React.useCallback(() => {
+        setRefreshing(true);
         fetchUser();
     }, []);
+
+    const getSocialLinkIcon = (platform: string) => {
+        switch (platform) {
+            case 'twitter':
+                return <FontAwesome name="twitter" size={16} color="#1DA1F2" />;
+            case 'linkedin':
+                return <FontAwesome name="linkedin" size={16} color="#0A66C2" />;
+            case 'web':
+                return <MaterialCommunityIcons name="web" size={16} color="#A259FF" />;
+            case 'github':
+                return <FontAwesome5 name="github" size={16} color="#333" />;
+            default:
+                return <Ionicons name="link" size={16} color="#666" />;
+        }
+    };
+
+    const getAchievementIcon = (iconName: string) => {
+        switch (iconName) {
+            case 'ribbon':
+                return <Ionicons name="ribbon-outline" size={20} color="#7F5FFF" />;
+            case 'bulb':
+                return <Ionicons name="bulb-outline" size={20} color="#7F5FFF" />;
+            default:
+                return <Ionicons name="star-outline" size={20} color="#7F5FFF" />;
+        }
+    };
 
     if (loading) {
         return (
@@ -76,7 +123,18 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={{ padding: 20 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#7F5FFF']}
+                        tintColor="#7F5FFF"
+                    />
+                }
+            >
                 {/* Header Row */}
                 <View style={styles.headerRow}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconBtn}>
@@ -114,7 +172,10 @@ export default function ProfileScreen() {
                 {/* Profile Card */}
                 <View style={styles.profileCard}>
                     <TouchableOpacity>
-                        <Image source={{ uri: user?.profileImage || user?.avatar || placeholderAvatar }} style={styles.avatar} />
+                        <Image
+                            source={{ uri: user?.profileImage || user?.avatar || placeholderAvatar }}
+                            style={styles.avatar}
+                        />
                     </TouchableOpacity>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
                         <Text style={styles.name}>{user?.fullName || user?.name || 'Jane Doe'}</Text>
@@ -126,26 +187,26 @@ export default function ProfileScreen() {
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Bio</Text>
                     </View>
-                    <Text style={styles.bioText}>{user?.bio || bio}</Text>
+                    <Text style={styles.bioText}>{user?.bio || 'No bio added yet.'}</Text>
                 </View>
                 {/* Social Links */}
                 <Text style={styles.sectionTitle}>Social Links</Text>
                 <View style={styles.socialLinksRow}>
-                    {socialLinks.map((link, idx) => (
+                    {user?.socialLinks?.map((link: SocialLink, idx: number) => (
                         <View key={idx} style={[styles.socialLink, { backgroundColor: link.color }]}>
-                            {link.icon}
+                            {getSocialLinkIcon(link.platform)}
                             <Text style={styles.socialLabel}>{link.label}</Text>
                         </View>
                     ))}
                 </View>
                 {/* Achievements */}
                 <Text style={styles.sectionTitle}>Achievements</Text>
-                {achievements.map((ach, idx) => (
+                {user?.achievements?.map((achievement: Achievement, idx: number) => (
                     <View key={idx} style={styles.achievementCard}>
-                        {ach.icon}
+                        {getAchievementIcon(achievement.icon)}
                         <View style={{ marginLeft: 12 }}>
-                            <Text style={styles.achievementTitle}>{ach.title}</Text>
-                            <Text style={styles.achievementDesc}>{ach.desc}</Text>
+                            <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                            <Text style={styles.achievementDesc}>{achievement.desc}</Text>
                         </View>
                     </View>
                 ))}

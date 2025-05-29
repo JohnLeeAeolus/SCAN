@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
     ScrollView,
+    RefreshControl,
+    ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -107,6 +109,37 @@ const statusColors: Record<DutyStatus, string> = {
 };
 
 export default function ScheduleScreen() {
+    const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    const fetchSchedule = async () => {
+        setLoading(true);
+        try {
+            // Add your schedule fetching logic here
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
+        } catch (error) {
+            console.error('Error fetching schedule:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        fetchSchedule();
+    }, []);
+
+    if (loading) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#7F5FFF" />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     const renderDutyCard = (duty: Duty) => (
         <View key={duty.id} style={styles.card}>
             <View style={styles.cardHeader}>
@@ -147,7 +180,18 @@ export default function ScheduleScreen() {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={{ padding: 16 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#7F5FFF']}
+                        tintColor="#7F5FFF"
+                    />
+                }
+            >
                 <View style={styles.root}>
                     <View style={styles.header}>
                         <Text style={styles.headerTitle}>Duty Schedule</Text>
@@ -172,9 +216,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        paddingTop: 18,
-        paddingBottom: 8,
+        paddingTop: 8,
+        paddingBottom: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F0',
     },

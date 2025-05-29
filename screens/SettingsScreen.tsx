@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Image, ActivityIndicator, Alert, TextInput, Modal, Platform, Animated, Easing } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Image, ActivityIndicator, Alert, TextInput, Modal, Platform, Animated, Easing, RefreshControl } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { auth, firestore } from '../firebase/config';
@@ -10,46 +10,555 @@ import * as ImagePicker from 'expo-image-picker';
 import { updatePassword } from 'firebase/auth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Update the EditModal component with better UI
+function EditModal({ visible, onClose, onSave, title, value, onChangeText, isPassword, isAvatar, saving, avatarLoading }: any) {
+    const [localValue, setLocalValue] = useState(value);
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const scale = React.useRef(new Animated.Value(0.9)).current;
+    const opacity = React.useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        setLocalValue(value);
+        setPassword('');
+        setConfirmPassword('');
+    }, [value]);
+
+    useEffect(() => {
+        if (visible) {
+            Animated.parallel([
+                Animated.spring(scale, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                    damping: 15,
+                    mass: 1,
+                    stiffness: 150,
+                }),
+                Animated.timing(opacity, {
+                    toValue: 1,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.spring(scale, {
+                    toValue: 0.9,
+                    useNativeDriver: true,
+                    damping: 15,
+                    mass: 1,
+                    stiffness: 150,
+                }),
+                Animated.timing(opacity, {
+                    toValue: 0,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [visible]);
+
+    const handleSave = () => {
+        if (isPassword) {
+            onSave(password, confirmPassword);
+        } else {
+            onSave(localValue);
+        }
+    };
+
+    if (!visible) return null;
+
+    return (
+        <Modal
+            transparent
+            visible={visible}
+            animationType="none"
+            onRequestClose={onClose}
+        >
+            <Animated.View
+                style={[
+                    styles.modalOverlay,
+                    { opacity }
+                ]}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlayTouchable}
+                    activeOpacity={1}
+                    onPress={onClose}
+                >
+                    <Animated.View
+                        style={[
+                            styles.modalContent,
+                            {
+                                transform: [{ scale }],
+                                opacity,
+                            }
+                        ]}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{title}</Text>
+                            <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
+                                <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            {isPassword ? (
+                                <>
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="New Password"
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry
+                                        autoCapitalize="none"
+                                        placeholderTextColor="#999"
+                                    />
+                                    <TextInput
+                                        style={styles.modalInput}
+                                        placeholder="Confirm New Password"
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry
+                                        autoCapitalize="none"
+                                        placeholderTextColor="#999"
+                                    />
+                                </>
+                            ) : isAvatar ? (
+                                <TouchableOpacity
+                                    style={[styles.modalButton, { marginBottom: 0 }]}
+                                    onPress={handleSave}
+                                    disabled={avatarLoading}
+                                >
+                                    <Text style={styles.modalButtonText}>
+                                        {avatarLoading ? 'Uploading...' : 'Pick New Photo'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={localValue}
+                                    onChangeText={setLocalValue}
+                                    editable={!saving}
+                                    autoFocus
+                                    autoCapitalize="none"
+                                    placeholderTextColor="#999"
+                                />
+                            )}
+                        </View>
+
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity
+                                onPress={onClose}
+                                style={[styles.modalButton, styles.modalButtonSecondary]}
+                            >
+                                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={handleSave}
+                                disabled={saving || avatarLoading}
+                                style={[
+                                    styles.modalButton,
+                                    styles.modalButtonPrimary,
+                                    (saving || avatarLoading) && styles.modalButtonDisabled
+                                ]}
+                            >
+                                <Text style={styles.modalButtonText}>
+                                    {saving ? 'Saving...' : 'Save'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
+                </TouchableOpacity>
+            </Animated.View>
+        </Modal>
+    );
+}
+
+// Add ProfileImageModal component at the top level
+function ProfileImageModal({ visible, imageUrl, onClose }: { visible: boolean; imageUrl: string; onClose: () => void }) {
+    if (!visible) return null;
+
+    return (
+        <Modal
+            transparent
+            visible={visible}
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <TouchableOpacity
+                style={styles.profileImageModalOverlay}
+                activeOpacity={1}
+                onPress={onClose}
+            >
+                <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.profileImageModal}
+                    resizeMode="contain"
+                />
+            </TouchableOpacity>
+        </Modal>
+    );
+}
+
+// Update TwoFAModal component to use props
+function TwoFAModal({
+    visible,
+    onClose,
+    onConfirm,
+    isEnable,
+    saving
+}: {
+    visible: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    isEnable: boolean;
+    saving: boolean;
+}) {
+    if (!visible) return null;
+    return (
+        <Modal transparent visible animationType="fade">
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>
+                            {isEnable ? 'Enable Two-Factor Authentication' : 'Disable Two-Factor Authentication'}
+                        </Text>
+                        <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
+                            <Ionicons name="close" size={24} color="#666" />
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.modalBody}>
+                        <Text style={{ color: '#444', marginBottom: 18 }}>
+                            {isEnable
+                                ? 'Two-factor authentication adds an extra layer of security. You will receive further instructions via email.'
+                                : 'Are you sure you want to disable two-factor authentication?'}
+                        </Text>
+                    </View>
+                    <View style={styles.modalFooter}>
+                        <TouchableOpacity
+                            onPress={onClose}
+                            style={[styles.modalButton, styles.modalButtonSecondary]}
+                        >
+                            <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={onConfirm}
+                            disabled={saving}
+                            style={[styles.modalButton, styles.modalButtonPrimary, saving && styles.modalButtonDisabled]}
+                        >
+                            <Text style={styles.modalButtonText}>{isEnable ? 'Enable' : 'Disable'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+function SocialLinksModal({
+    visible,
+    onClose,
+    onSave,
+    user,
+    saving
+}: {
+    visible: boolean;
+    onClose: () => void;
+    onSave: (socialLinks: Array<{ platform: string, label: string, color: string }>) => void;
+    user: any;
+    saving: boolean;
+}) {
+    const [socialLinksDraft, setSocialLinksDraft] = useState<Array<{ platform: string, label: string, color: string }>>(user?.socialLinks || []);
+    const [newPlatform, setNewPlatform] = useState('');
+    const [newLabel, setNewLabel] = useState('');
+    const [newColor, setNewColor] = useState('#E6F4FD');
+
+    useEffect(() => {
+        if (visible) {
+            setSocialLinksDraft(user?.socialLinks || []);
+            setNewPlatform('');
+            setNewLabel('');
+            setNewColor('#E6F4FD');
+        }
+    }, [visible, user]);
+
+    const getPlatformColor = (platform: string) => {
+        switch (platform) {
+            case 'twitter': return '#E6F4FD';
+            case 'linkedin': return '#E6F0FA';
+            case 'web': return '#F3E6FF';
+            case 'github': return '#F0F0F0';
+            default: return '#F5F5F5';
+        }
+    };
+
+    const handleAddSocialLink = () => {
+        if (newPlatform.trim() && newLabel.trim()) {
+            const color = getPlatformColor(newPlatform.trim());
+            setSocialLinksDraft([...socialLinksDraft, {
+                platform: newPlatform.trim(),
+                label: newLabel.trim(),
+                color
+            }]);
+            setNewPlatform('');
+            setNewLabel('');
+            setNewColor('#E6F4FD');
+        }
+    };
+
+    const handleRemoveSocialLink = (index: number) => {
+        setSocialLinksDraft(socialLinksDraft.filter((_, idx) => idx !== index));
+    };
+
+    const handleSave = () => {
+        onSave(socialLinksDraft);
+    };
+
+    if (!visible) return null;
+
+    return (
+        <Modal transparent visible={true} animationType="none">
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Edit Social Links</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
+                        <Ionicons name="close" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.modalBody}>
+                    {socialLinksDraft.map((link, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#222', fontWeight: '500' }}>{link.platform}</Text>
+                                <Text style={{ color: '#666' }}>{link.label}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => handleRemoveSocialLink(idx)}>
+                                <Ionicons name="close-circle-outline" size={20} color="#E57373" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                    <View style={{ marginTop: 16 }}>
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Platform (twitter, linkedin, web, github)"
+                            value={newPlatform}
+                            onChangeText={setNewPlatform}
+                            placeholderTextColor="#999"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Label (e.g., @username)"
+                            value={newLabel}
+                            onChangeText={setNewLabel}
+                            placeholderTextColor="#999"
+                        />
+                        <TouchableOpacity
+                            onPress={handleAddSocialLink}
+                            disabled={!newPlatform.trim() || !newLabel.trim()}
+                            style={[
+                                styles.modalButton,
+                                styles.modalButtonPrimary,
+                                (!newPlatform.trim() || !newLabel.trim()) && styles.modalButtonDisabled
+                            ]}
+                        >
+                            <Text style={styles.modalButtonText}>Add Link</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+                <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        style={[styles.modalButton, styles.modalButtonSecondary]}
+                    >
+                        <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={handleSave}
+                        disabled={saving}
+                        style={[styles.modalButton, styles.modalButtonPrimary, saving && styles.modalButtonDisabled]}
+                    >
+                        <Text style={styles.modalButtonText}>Save</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
+// Achievements Modal
+function AchievementsModal({
+    visible,
+    onClose,
+    onSave,
+    user,
+    saving
+}: {
+    visible: boolean;
+    onClose: () => void;
+    onSave: (achievements: Array<{ icon: string, title: string, desc: string }>) => void;
+    user: any;
+    saving: boolean;
+}) {
+    const [achievementsDraft, setAchievementsDraft] = useState<Array<{ icon: string, title: string, desc: string }>>(user?.achievements || []);
+    const [newIcon, setNewIcon] = useState('');
+    const [newTitle, setNewTitle] = useState('');
+    const [newDesc, setNewDesc] = useState('');
+
+    useEffect(() => {
+        if (visible) {
+            setAchievementsDraft(user?.achievements || []);
+            setNewIcon('');
+            setNewTitle('');
+            setNewDesc('');
+        }
+    }, [visible, user]);
+
+    const handleAddAchievement = () => {
+        if (newIcon.trim() && newTitle.trim() && newDesc.trim()) {
+            setAchievementsDraft([...achievementsDraft, {
+                icon: newIcon.trim(),
+                title: newTitle.trim(),
+                desc: newDesc.trim()
+            }]);
+            setNewIcon('');
+            setNewTitle('');
+            setNewDesc('');
+        }
+    };
+
+    const handleRemoveAchievement = (index: number) => {
+        setAchievementsDraft(achievementsDraft.filter((_, idx) => idx !== index));
+    };
+
+    const handleSave = () => {
+        onSave(achievementsDraft);
+    };
+
+    if (!visible) return null;
+
+    return (
+        <Modal transparent visible={true} animationType="none">
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Edit Achievements</Text>
+                    <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
+                        <Ionicons name="close" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
+                <View style={styles.modalBody}>
+                    {achievementsDraft.map((achievement, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#222', fontWeight: '500' }}>{achievement.title}</Text>
+                                <Text style={{ color: '#666' }}>{achievement.desc}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => handleRemoveAchievement(idx)}>
+                                <Ionicons name="close-circle-outline" size={20} color="#E57373" />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                    <View style={{ marginTop: 16 }}>
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Icon (ribbon, bulb, star)"
+                            value={newIcon}
+                            onChangeText={setNewIcon}
+                            placeholderTextColor="#999"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Title"
+                            value={newTitle}
+                            onChangeText={setNewTitle}
+                            placeholderTextColor="#999"
+                        />
+                        <TextInput
+                            style={styles.modalInput}
+                            placeholder="Description"
+                            value={newDesc}
+                            onChangeText={setNewDesc}
+                            placeholderTextColor="#999"
+                        />
+                        <TouchableOpacity
+                            onPress={handleAddAchievement}
+                            disabled={!newIcon.trim() || !newTitle.trim() || !newDesc.trim()}
+                            style={[
+                                styles.modalButton,
+                                styles.modalButtonPrimary,
+                                (!newIcon.trim() || !newTitle.trim() || !newDesc.trim()) && styles.modalButtonDisabled
+                            ]}
+                        >
+                            <Text style={styles.modalButtonText}>Add Achievement</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+                <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        style={[styles.modalButton, styles.modalButtonSecondary]}
+                    >
+                        <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={handleSave}
+                        disabled={saving}
+                        style={[styles.modalButton, styles.modalButtonPrimary, saving && styles.modalButtonDisabled]}
+                    >
+                        <Text style={styles.modalButtonText}>Save</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
 export default function SettingsScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [pushNotifications, setPushNotifications] = useState(false);
     const [emailNotifications, setEmailNotifications] = useState(false);
     const [twoFactor, setTwoFactor] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [activeModal, setActiveModal] = useState<null | 'nickname' | 'fullname' | 'password' | 'avatar' | 'bio' | 'local' | 'status' | 'socialLinks' | 'devices'>(null);
-    const [editingDevices, setEditingDevices] = useState(false);
-    const [devices, setDevices] = useState([
-        { id: '1', name: 'iPhone 15 Pro', lastActive: 'Today, 10:12 AM' },
-        { id: '2', name: 'iPad Air', lastActive: 'Yesterday, 8:45 PM' },
-    ]);
-    const [editValue, setEditValue] = useState('');
-    const [editPassword, setEditPassword] = useState('');
-    const [editPasswordConfirm, setEditPasswordConfirm] = useState('');
-    const [avatarLoading, setAvatarLoading] = useState(false);
+    const [activeModal, setActiveModal] = useState<null | 'nickname' | 'fullname' | 'password' | 'avatar' | 'bio' | 'local' | 'status' | 'socialLinks' | 'callSign' | 'duty' | 'defaultLocation' | 'achievements'>(null);
     const [show2FAModal, setShow2FAModal] = useState(false);
     const [twoFAAction, setTwoFAAction] = useState<'enable' | 'disable' | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalType, setModalType] = useState<string | null>(null);
+    const [modalValue, setModalValue] = useState('');
+    const [showProfileImage, setShowProfileImage] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [avatarLoading, setAvatarLoading] = useState(false);
+
+    const fetchUser = async () => {
+        try {
+            const currentUser = auth.currentUser;
+            if (!currentUser) return;
+            const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
+            if (userDoc.exists()) {
+                const data = userDoc.data();
+                setUser(data);
+                setPushNotifications(!!data.pushNotifications);
+                setEmailNotifications(!!data.emailNotifications);
+                setTwoFactor(!!data.twoFactor);
+            }
+        } catch (error) {
+            console.error('Error fetching user:', error);
+            Alert.alert('Error', 'Failed to fetch user data');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const currentUser = auth.currentUser;
-                if (!currentUser) return;
-                const userDoc = await getDoc(doc(firestore, 'users', currentUser.uid));
-                if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    setUser(data);
-                    setPushNotifications(!!data.pushNotifications);
-                    setEmailNotifications(!!data.emailNotifications);
-                    setTwoFactor(!!data.twoFactor);
-                }
-            } catch (error) {
-                Alert.alert('Error', 'Failed to fetch user data.');
-            } finally {
-                setLoading(false);
-            }
-        };
+        fetchUser();
+    }, []);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
         fetchUser();
     }, []);
 
@@ -97,392 +606,262 @@ export default function SettingsScreen() {
         }
     };
 
-    const handleEditDevices = () => setEditingDevices(true);
-    const handleRemoveDevice = (id: string) => setDevices(devices.filter(d => d.id !== id));
-
-    // Helper to open modal and set initial value
-    const openEditModal = (field: string) => {
-        setActiveModal(field as any);
-        if (field === 'nickname') setEditValue(user?.username || '');
-        else if (field === 'fullname') setEditValue(user?.fullName || user?.name || '');
-        else if (field === 'bio') setEditValue(user?.bio || '');
-        else if (field === 'local') setEditValue(user?.congregation || '');
-        else if (field === 'password') { setEditPassword(''); setEditPasswordConfirm(''); }
+    const openEditModal = (type: string) => {
+        setModalType(type);
+        let value = '';
+        if (type === 'nickname') value = user?.username || '';
+        else if (type === 'fullname') value = user?.fullName || user?.name || '';
+        else if (type === 'bio') value = user?.bio || '';
+        else if (type === 'local') value = user?.congregation || '';
+        else if (type === 'callSign') value = user?.callSign || '';
+        else if (type === 'duty') value = user?.duty || '';
+        else if (type === 'defaultLocation') value = user?.defaultLocation || '';
+        setModalValue(value);
+        setModalVisible(true);
     };
 
-    // Save logic for each field
-    const handleSaveEdit = async () => {
+    const handleModalSave = async (value: string, confirmValue?: string) => {
         setSaving(true);
         try {
             const currentUser = auth.currentUser;
             if (!currentUser) throw new Error('No user');
-            if (activeModal === 'nickname') {
-                await updateDoc(doc(firestore, 'users', currentUser.uid), { username: editValue.trim() });
-                setUser((prev: any) => ({ ...prev, username: editValue.trim() }));
-            } else if (activeModal === 'fullname') {
-                await updateDoc(doc(firestore, 'users', currentUser.uid), { fullName: editValue.trim() });
-                setUser((prev: any) => ({ ...prev, fullName: editValue.trim() }));
-            } else if (activeModal === 'bio') {
-                await updateDoc(doc(firestore, 'users', currentUser.uid), { bio: editValue });
-                setUser((prev: any) => ({ ...prev, bio: editValue }));
-            } else if (activeModal === 'local') {
-                await updateDoc(doc(firestore, 'users', currentUser.uid), { congregation: editValue });
-                setUser((prev: any) => ({ ...prev, congregation: editValue }));
-            } else if (activeModal === 'password') {
-                if (!editPassword || editPassword !== editPasswordConfirm) {
+
+            if (modalType === 'password') {
+                if (!value || value !== confirmValue) {
                     Alert.alert('Error', 'Passwords do not match.');
-                    setSaving(false);
                     return;
                 }
-                await updatePassword(currentUser, editPassword);
+                await updatePassword(currentUser, value);
                 Alert.alert('Success', 'Password updated!');
-            } else if (activeModal === 'avatar') {
+            } else if (modalType === 'avatar') {
                 setAvatarLoading(true);
-                const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.7 });
+                const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                    allowsEditing: true,
+                    aspect: [1, 1],
+                    quality: 0.7
+                });
                 if (!result.canceled && result.assets && result.assets.length > 0) {
                     const uri = result.assets[0].uri;
                     await updateDoc(doc(firestore, 'users', currentUser.uid), { profileImage: uri });
                     setUser((prev: any) => ({ ...prev, profileImage: uri }));
                 }
                 setAvatarLoading(false);
+            } else {
+                const fieldMap: { [key: string]: string } = {
+                    nickname: 'username',
+                    fullname: 'fullName',
+                    bio: 'bio',
+                    local: 'congregation',
+                    callSign: 'callSign',
+                    duty: 'duty',
+                    defaultLocation: 'defaultLocation'
+                };
+                const field = fieldMap[modalType || ''];
+                if (field) {
+                    await updateDoc(doc(firestore, 'users', currentUser.uid), { [field]: value });
+                    setUser((prev: any) => ({ ...prev, [field]: value }));
+                }
             }
-            setActiveModal(null);
-            setEditValue('');
-            setEditPassword('');
-            setEditPasswordConfirm('');
+            setModalVisible(false);
             Alert.alert('Success', 'Updated!');
-        } catch (e) {
+        } catch (error) {
             Alert.alert('Error', 'Failed to update.');
         } finally {
             setSaving(false);
         }
     };
 
-    // Helper for rendering editable row
-    function EditableRow({ label, value, editing, onEdit, onSave, onCancel, onChangeText, loading, secureTextEntry = false }: any) {
-        return editing ? (
-            <View style={styles.row}>
-                <View style={styles.rowIcon}><Ionicons name="pencil-outline" size={20} color="#888" /></View>
-                <TextInput
-                    style={[styles.rowLabel, { flex: 1, borderBottomWidth: 1, borderColor: '#7F5FFF', marginRight: 8 }]}
-                    value={value}
-                    onChangeText={onChangeText}
-                    editable={!loading}
-                    secureTextEntry={secureTextEntry}
-                    autoFocus
-                />
-                <TouchableOpacity onPress={onSave} disabled={loading} style={{ marginRight: 8 }}>
-                    <Ionicons name="checkmark" size={22} color="#7F5FFF" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onCancel} disabled={loading}>
-                    <Ionicons name="close" size={22} color="#888" />
-                </TouchableOpacity>
-            </View>
-        ) : (
-            <SettingsRow icon={<Ionicons name="pencil-outline" size={20} color="#888" />} label={label} subLabel={value} onPress={onEdit} />
-        );
-    }
-
-    // Avatar row
-    function AvatarRow() {
-        return (
-            <TouchableOpacity style={styles.row} onPress={() => setActiveModal('avatar')} disabled={saving}>
-                <View style={styles.rowIcon}><MaterialCommunityIcons name="pencil-outline" size={20} color="#888" /></View>
-                <Image source={{ uri: user?.profileImage || user?.avatar || 'https://ui-avatars.com/api/?name=JD&background=7F5FFF&color=fff&size=64' }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 12 }} />
-                <Text style={styles.rowLabel}>Change Avatar/Photo</Text>
-                <Ionicons name="chevron-forward" size={20} color="#bbb" />
-            </TouchableOpacity>
-        );
-    }
-
-    // Social Links Modal
-    function SocialLinksModal() {
-        const [socialLinksDraft, setSocialLinksDraft] = useState(user?.socialLinks || []);
-        const [newSocialLink, setNewSocialLink] = useState('');
-        useEffect(() => {
-            if (activeModal === 'socialLinks') {
-                setSocialLinksDraft(user?.socialLinks || []);
-                setNewSocialLink('');
-            }
-        }, [activeModal]);
-        const handleAddSocialLink = () => {
-            if (newSocialLink.trim() && !socialLinksDraft.includes(newSocialLink.trim())) {
-                setSocialLinksDraft([...socialLinksDraft, newSocialLink.trim()]);
-                setNewSocialLink('');
-            }
-        };
-        const handleRemoveSocialLink = (link: string) => {
-            setSocialLinksDraft(socialLinksDraft.filter((l: string) => l !== link));
-        };
-        const handleSaveSocialLinks = async () => {
-            setSaving(true);
-            try {
-                const currentUser = auth.currentUser;
-                if (!currentUser) throw new Error('No user');
-                await updateDoc(doc(firestore, 'users', currentUser.uid), { socialLinks: socialLinksDraft });
-                setUser((prev: any) => ({ ...prev, socialLinks: socialLinksDraft }));
-                setActiveModal(null);
-                Alert.alert('Success', 'Social links updated!');
-            } catch (e) {
-                Alert.alert('Error', 'Failed to update social links.');
-            } finally {
-                setSaving(false);
-            }
-        };
-        if (activeModal !== 'socialLinks') return null;
-        // Pop-up animation
-        const [visible, setVisible] = useState(true);
-        const scale = React.useRef(new Animated.Value(0.8)).current;
-        const opacity = React.useRef(new Animated.Value(0)).current;
-        useEffect(() => {
-            Animated.parallel([
-                Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-            ]).start();
-            return () => {
-                scale.setValue(0.8);
-                opacity.setValue(0);
-            };
-        }, []);
-        return (
-            <Modal transparent visible={visible} animationType="none">
-                <View style={styles.modalOverlay}>
-                    <Animated.View style={[styles.popupModal, { transform: [{ scale }], opacity }]}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Edit Social Links</Text>
-                        {socialLinksDraft.map((link: string, idx: number) => (
-                            <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                                <Text style={{ flex: 1, color: '#222' }}>{link}</Text>
-                                <TouchableOpacity onPress={() => handleRemoveSocialLink(link)}>
-                                    <Ionicons name="close-circle-outline" size={20} color="#E57373" />
-                                </TouchableOpacity>
-                            </View>
-                        ))}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-                            <TextInput
-                                style={[styles.input, { flex: 1, marginRight: 8 }]}
-                                placeholder="Add new link"
-                                value={newSocialLink}
-                                onChangeText={setNewSocialLink}
-                            />
-                            <TouchableOpacity onPress={handleAddSocialLink} disabled={!newSocialLink.trim()}>
-                                <Ionicons name="add-circle-outline" size={28} color={newSocialLink.trim() ? '#7F5FFF' : '#ccc'} />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
-                            <TouchableOpacity onPress={() => { setVisible(false); setActiveModal(null); }} style={{ marginRight: 16 }}>
-                                <Text style={{ color: '#888', fontSize: 16 }}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleSaveSocialLinks} disabled={saving}>
-                                <Text style={{ color: '#7F5FFF', fontWeight: 'bold', fontSize: 16 }}>Save</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
-        );
-    }
-
-    // Animated modal helper
-    function AnimatedModal({ visible, children }: { visible: boolean; children: React.ReactNode }) {
-        const [show, setShow] = useState(visible);
-        const opacity = React.useRef(new Animated.Value(0)).current;
-        useEffect(() => {
-            if (visible) {
-                setShow(true);
-                Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true, easing: Easing.out(Easing.ease) }).start();
-            } else {
-                Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true, easing: Easing.in(Easing.ease) }).start(() => setShow(false));
-            }
-        }, [visible]);
-        if (!show) return null;
-        return (
-            <Modal transparent visible={show} animationType={Platform.OS === 'ios' ? 'fade' : undefined}>
-                <Animated.View style={[styles.modalOverlay, { opacity }]}>{children}</Animated.View>
-            </Modal>
-        );
-    }
-
-    // Device Modal
-    function DevicesModal() {
-        return (
-            <AnimatedModal visible={editingDevices}>
-                <View style={[styles.modalContent, { borderTopColor: '#7F5FFF', borderTopWidth: 4 }]}>
-                    <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12, color: '#7F5FFF' }}>Linked Devices</Text>
-                    {devices.length === 0 ? (
-                        <Text style={{ color: '#888', marginBottom: 12 }}>No devices linked.</Text>
-                    ) : (
-                        devices.map(device => (
-                            <View key={device.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                <Ionicons name="phone-portrait-outline" size={20} color="#7F5FFF" style={{ marginRight: 8 }} />
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: '#222', fontWeight: '500' }}>{device.name}</Text>
-                                    <Text style={{ color: '#888', fontSize: 12 }}>Last active: {device.lastActive}</Text>
-                                </View>
-                                <TouchableOpacity onPress={() => handleRemoveDevice(device.id)}>
-                                    <Ionicons name="trash-outline" size={20} color="#E57373" />
-                                </TouchableOpacity>
-                            </View>
-                        ))
-                    )}
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
-                        <TouchableOpacity onPress={() => setEditingDevices(false)}>
-                            <Text style={{ color: '#7F5FFF', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </AnimatedModal>
-        );
-    }
-
-    // Dynamic Modal
-    function EditModal() {
-        if (!activeModal || activeModal === 'socialLinks' || activeModal === 'devices') return null;
-        let label = '';
-        if (activeModal === 'nickname') label = 'Edit Nickname';
-        else if (activeModal === 'fullname') label = 'Edit Full Name';
-        else if (activeModal === 'bio') label = 'Edit Bio';
-        else if (activeModal === 'local') label = 'Edit Local';
-        else if (activeModal === 'password') label = 'Change Password';
-        else if (activeModal === 'avatar') label = 'Change Profile Photo';
-
-        // Animation
-        const [visible, setVisible] = useState(true);
-        const scale = React.useRef(new Animated.Value(0.8)).current;
-        const opacity = React.useRef(new Animated.Value(0)).current;
-        useEffect(() => {
-            Animated.parallel([
-                Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-            ]).start();
-            return () => {
-                scale.setValue(0.8);
-                opacity.setValue(0);
-            };
-        }, []);
-
-        return (
-            <Modal transparent visible={visible} animationType="none">
-                <View style={styles.modalOverlay}>
-                    <Animated.View style={[styles.popupModal, { transform: [{ scale }], opacity }]}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>{label}</Text>
-                        {activeModal === 'password' ? (
-                            <>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="New Password"
-                                    value={editPassword}
-                                    onChangeText={setEditPassword}
-                                    secureTextEntry
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Confirm New Password"
-                                    value={editPasswordConfirm}
-                                    onChangeText={setEditPasswordConfirm}
-                                    secureTextEntry
-                                />
-                            </>
-                        ) : activeModal === 'avatar' ? (
-                            <TouchableOpacity style={[styles.button, { marginBottom: 16 }]} onPress={handleSaveEdit} disabled={avatarLoading}>
-                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>{avatarLoading ? 'Uploading...' : 'Pick New Photo'}</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <TextInput
-                                style={styles.input}
-                                value={editValue}
-                                onChangeText={setEditValue}
-                                editable={!saving}
-                                autoFocus
-                            />
-                        )}
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
-                            <TouchableOpacity onPress={() => { setVisible(false); setActiveModal(null); }} style={{ marginRight: 16 }}>
-                                <Text style={{ color: '#888', fontSize: 16 }}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleSaveEdit} disabled={saving || (activeModal === 'avatar' && avatarLoading)}>
-                                <Text style={{ color: '#7F5FFF', fontWeight: 'bold', fontSize: 16 }}>Save</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
-        );
-    }
-
-    function TwoFAModal() {
-        if (!show2FAModal) return null;
-        const isEnable = twoFAAction === 'enable';
-        return (
-            <Modal transparent visible animationType="fade">
-                <View style={styles.modalOverlay}>
-                    <Animated.View style={[styles.popupModal, { opacity: 1, transform: [{ scale: 1 }] }]}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>{isEnable ? 'Enable Two-Factor Authentication' : 'Disable Two-Factor Authentication'}</Text>
-                        <Text style={{ color: '#444', marginBottom: 18 }}>
-                            {isEnable
-                                ? 'Two-factor authentication adds an extra layer of security. You will receive further instructions via email.'
-                                : 'Are you sure you want to disable two-factor authentication?'}
-                        </Text>
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
-                            <TouchableOpacity onPress={() => { setShow2FAModal(false); setTwoFAAction(null); }} style={{ marginRight: 16 }}>
-                                <Text style={{ color: '#888', fontSize: 16 }}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={handleConfirm2FA} disabled={saving}>
-                                <Text style={{ color: '#7F5FFF', fontWeight: 'bold', fontSize: 16 }}>{isEnable ? 'Enable' : 'Disable'}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
-        );
-    }
+    const handleLogout = async () => {
+        try {
+            await auth.signOut();
+            navigation.reset({
+                index: 0,
+                routes: [{ name: 'SignIn' }],
+            });
+        } catch (error) {
+            console.error('Error signing out:', error);
+            Alert.alert('Error', 'Failed to sign out');
+        }
+    };
 
     if (loading) {
-        return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}><ActivityIndicator size="large" color="#7F5FFF" /></View>;
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#7F5FFF" />
+                </View>
+            </SafeAreaView>
+        );
     }
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                contentContainerStyle={{ padding: 20 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#7F5FFF']}
+                        tintColor="#7F5FFF"
+                    />
+                }
+            >
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Ionicons name="arrow-back-outline" size={24} color="#222" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Settings</Text>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowProfileImage(true)}>
                         <Image
-                            source={{ uri: user?.profileImage || user?.avatar || 'https://ui-avatars.com/api/?name=JD&background=7F5FFF&color=fff&size=64' }}
+                            source={{
+                                uri: user?.profileImage || user?.avatar || 'https://ui-avatars.com/api/?name=JD&background=7F5FFF&color=fff&size=64'
+                            }}
                             style={styles.avatar}
                         />
                     </TouchableOpacity>
                 </View>
 
                 {/* Account Section */}
-                <Text style={styles.sectionHeader}>Account</Text>
-                <SettingsRow icon={<Ionicons name="person-outline" size={20} color="#888" />} label="Nickname" subLabel={user?.username || 'N/A'} onPress={() => openEditModal('nickname')} />
-                <SettingsRow icon={<Ionicons name="person-outline" size={20} color="#888" />} label="Full Name" subLabel={user?.fullName || user?.name || 'N/A'} onPress={() => openEditModal('fullname')} />
-                <AvatarRow />
-                <SettingsRow icon={<MaterialCommunityIcons name="shield-account-outline" size={20} color="#888" />} label="Manage Access" subLabel="Permissions and roles" onPress={() => navigation.navigate('ManageAccess' as never)} />
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Account</Text>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => navigation.navigate('EditProfile' as never)}
+                    >
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingLabel}>Edit Profile</Text>
+                            <Text style={styles.settingDescription}>Update your personal information</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#666" />
+                    </TouchableOpacity>
 
-                {/* Password Modal */}
-                <SettingsRow icon={<Ionicons name="lock-closed-outline" size={20} color="#888" />} label="Change Password" subLabel="Update your login credentials" onPress={() => openEditModal('password')} />
-                <SettingsSwitchRow icon={<Ionicons name="notifications-outline" size={20} color="#888" />} label="Push Notifications" subLabel="Receive alerts on your device" value={pushNotifications} onValueChange={(v: boolean) => handleToggle('pushNotifications', v)} saving={saving} />
-                <SettingsSwitchRow icon={<Ionicons name="mail-outline" size={20} color="#888" />} label="Email Notifications" subLabel="Receive alerts via email" value={emailNotifications} onPress={() => handleToggle('emailNotifications', !emailNotifications)} saving={saving} />
-                <SettingsRow icon={<Ionicons name="time-outline" size={20} color="#888" />} label="Notification Frequency" subLabel="Choose how often you receive emails" onPress={() => navigation.navigate('NotificationFrequency' as never)} />
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => {
+                            setTwoFAAction(user?.twoFactorEnabled ? 'disable' : 'enable');
+                            setShow2FAModal(true);
+                        }}
+                    >
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingLabel}>Two-Factor Authentication</Text>
+                            <Text style={styles.settingDescription}>
+                                {user?.twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
 
-                {/* Security Section */}
-                <Text style={styles.sectionHeader}>Security</Text>
-                <SettingsRow icon={<MaterialCommunityIcons name="shield-lock-outline" size={20} color="#888" />} label="Two-Factor Authentication" subLabel="Add an extra layer of security" value={twoFactor} onValueChange={handleToggleTwoFactor} saving={saving} />
-                <SettingsRow icon={<Ionicons name="share-social-outline" size={20} color="#888" />} label="Social Links" subLabel={user?.socialLinks?.length ? user.socialLinks.join(', ') : 'N/A'} onPress={() => setActiveModal('socialLinks')} />
-                <SocialLinksModal />
+                {/* Notifications Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Notifications</Text>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => navigation.navigate('NotificationFrequency' as never)}
+                    >
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingLabel}>Email Frequency</Text>
+                            <Text style={styles.settingDescription}>Manage your notification preferences</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
 
-                {/* Editable Fields */}
-                <Text style={styles.sectionHeader}>Personal Information</Text>
-                <SettingsRow icon={<Ionicons name="person-outline" size={20} color="#888" />} label="Bio" subLabel={user?.bio || 'N/A'} onPress={() => openEditModal('bio')} />
-                <SettingsRow icon={<Ionicons name="home-outline" size={20} color="#888" />} label="Local" subLabel={user?.congregation || 'N/A'} onPress={() => openEditModal('local')} />
-                <EditModal />
-                <TwoFAModal />
+                {/* Support Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Support</Text>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => navigation.navigate('Help' as never)}
+                    >
+                        <View style={styles.settingInfo}>
+                            <Text style={styles.settingLabel}>Help & Support</Text>
+                            <Text style={styles.settingDescription}>Get help and contact support</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                    style={styles.logoutButton}
+                    onPress={handleLogout}
+                >
+                    <Text style={styles.logoutText}>Log Out</Text>
+                </TouchableOpacity>
+
+                <EditModal
+                    visible={modalVisible}
+                    onClose={() => setModalVisible(false)}
+                    onSave={handleModalSave}
+                    title={modalType ? `Edit ${modalType.charAt(0).toUpperCase() + modalType.slice(1)}` : ''}
+                    value={modalValue}
+                    onChangeText={setModalValue}
+                    isPassword={modalType === 'password'}
+                    isAvatar={modalType === 'avatar'}
+                    saving={saving}
+                    avatarLoading={avatarLoading}
+                />
+                <TwoFAModal
+                    visible={show2FAModal}
+                    onClose={() => setShow2FAModal(false)}
+                    onConfirm={handleConfirm2FA}
+                    isEnable={twoFAAction === 'enable'}
+                    saving={saving}
+                />
+                <SocialLinksModal
+                    visible={activeModal === 'socialLinks'}
+                    onClose={() => setActiveModal(null)}
+                    onSave={async (socialLinks) => {
+                        setSaving(true);
+                        try {
+                            const currentUser = auth.currentUser;
+                            if (!currentUser) throw new Error('No user');
+                            await updateDoc(doc(firestore, 'users', currentUser.uid), { socialLinks });
+                            setUser((prev: any) => ({ ...prev, socialLinks }));
+                            setActiveModal(null);
+                            Alert.alert('Success', 'Social links updated!');
+                        } catch (e) {
+                            Alert.alert('Error', 'Failed to update social links.');
+                        } finally {
+                            setSaving(false);
+                        }
+                    }}
+                    user={user}
+                    saving={saving}
+                />
+                <AchievementsModal
+                    visible={activeModal === 'achievements'}
+                    onClose={() => setActiveModal(null)}
+                    onSave={async (achievements) => {
+                        setSaving(true);
+                        try {
+                            const currentUser = auth.currentUser;
+                            if (!currentUser) throw new Error('No user');
+                            await updateDoc(doc(firestore, 'users', currentUser.uid), { achievements });
+                            setUser((prev: any) => ({ ...prev, achievements }));
+                            setActiveModal(null);
+                            Alert.alert('Success', 'Achievements updated!');
+                        } catch (e) {
+                            Alert.alert('Error', 'Failed to update achievements.');
+                        } finally {
+                            setSaving(false);
+                        }
+                    }}
+                    user={user}
+                    saving={saving}
+                />
             </ScrollView>
+
+            {/* Add ProfileImageModal */}
+            <ProfileImageModal
+                visible={showProfileImage}
+                imageUrl={user?.profileImage || user?.avatar || 'https://ui-avatars.com/api/?name=JD&background=7F5FFF&color=fff&size=64'}
+                onClose={() => setShowProfileImage(false)}
+            />
         </SafeAreaView>
     );
 }
@@ -517,16 +896,13 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
-        paddingHorizontal: 0,
-        paddingTop: 20,
     },
     headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        paddingTop: 18,
-        paddingBottom: 12,
+        paddingTop: 8,
+        paddingBottom: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#F0F0F0',
         backgroundColor: '#fff',
@@ -546,15 +922,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: 'bold',
         color: '#7F5FFF',
-        marginTop: 28,
-        marginBottom: 8,
-        paddingHorizontal: 18,
+        marginTop: 24,
+        marginBottom: 12,
+        paddingHorizontal: 16,
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 18,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: '#F5F5F5',
@@ -576,37 +952,145 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalOverlayTouchable: {
+        flex: 1,
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     modalContent: {
         backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        width: '80%',
+        borderRadius: 16,
+        width: '90%',
         maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
-    input: {
-        padding: 10,
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        marginBottom: 10,
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
     },
-    button: {
-        padding: 10,
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#222',
+    },
+    modalCloseButton: {
+        padding: 4,
+    },
+    modalBody: {
+        padding: 16,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        gap: 12,
+    },
+    modalInput: {
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        marginBottom: 10,
+        borderColor: '#E0E0E0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        backgroundColor: '#fff',
+        marginBottom: 12,
+        color: '#222',
+    },
+    modalButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 100,
+    },
+    modalButtonPrimary: {
         backgroundColor: '#7F5FFF',
     },
-    popupModal: {
+    modalButtonSecondary: {
+        backgroundColor: '#f5f5f5',
+    },
+    modalButtonDisabled: {
+        opacity: 0.7,
+    },
+    modalButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    modalButtonTextSecondary: {
+        color: '#666',
+        fontWeight: '500',
+        fontSize: 16,
+    },
+    profileImageModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    profileImageModal: {
+        width: '100%',
+        height: '100%',
+    },
+    section: {
+        marginBottom: 20,
+    },
+    sectionTitle: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#7F5FFF',
+        marginBottom: 12,
+        paddingHorizontal: 16,
+    },
+    settingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
         backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        width: '80%',
-        maxWidth: 400,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F5F5F5',
+    },
+    settingInfo: {
+        flex: 1,
+    },
+    settingLabel: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#222',
+    },
+    settingDescription: {
+        fontSize: 13,
+        color: '#888',
+        marginTop: 2,
+    },
+    logoutButton: {
+        padding: 16,
+        backgroundColor: '#7F5FFF',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoutText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
 }); 

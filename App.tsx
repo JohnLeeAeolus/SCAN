@@ -23,9 +23,10 @@ import ChangeAvatarScreen from './screens/ChangeAvatarScreen';
 import ManageAccessScreen from './screens/ManageAccessScreen';
 import NotificationFrequencyScreen from './screens/NotificationFrequencyScreen';
 import ChangePasswordScreen from './screens/ChangePasswordScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import HelpScreen from './screens/HelpScreen';
 
-
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function MainTabs({ route }: { route?: { params?: { screen?: string } } }) {
@@ -93,24 +94,25 @@ export default function App() {
     return (
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {user ? (
-                    setupComplete === false ? (
-                        <Stack.Screen name="SetupAccount" component={SetupAccountScreen} />
-                    ) : (
-                        <>
-                            <Stack.Screen name="MainTabs" component={MainTabs} />
-                            <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-                            <Stack.Screen name="ChangeUsername" component={ChangeUsernameScreen} />
-                            <Stack.Screen name="ChangeAvatar" component={ChangeAvatarScreen} />
-                            <Stack.Screen name="ManageAccess" component={ManageAccessScreen} />
-                            <Stack.Screen name="NotificationFrequency" component={NotificationFrequencyScreen} />
-                            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-                        </>
-                    )
+                {!user ? (
+                    <>
+                        <Stack.Screen name="SignIn" component={SignInScreen} />
+                        <Stack.Screen name="SignUp" component={SignUpScreen} />
+                        <Stack.Screen name="ForgotPassword" component={SignInScreen} />
+                    </>
+                ) : setupComplete === false ? (
+                    <Stack.Screen name="SetupAccount" component={SetupAccountScreen} />
                 ) : (
                     <>
-                        <Stack.Screen name="SignUp" component={SignUpScreen} />
-                        <Stack.Screen name="SignIn" component={SignInScreen} />
+                        <Stack.Screen name="MainTabs" component={MainTabs} />
+                        <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+                        <Stack.Screen name="ChangeUsername" component={ChangeUsernameScreen} />
+                        <Stack.Screen name="ChangeAvatar" component={ChangeAvatarScreen} />
+                        <Stack.Screen name="ManageAccess" component={ManageAccessScreen} />
+                        <Stack.Screen name="NotificationFrequency" component={NotificationFrequencyScreen} />
+                        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+                        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                        <Stack.Screen name="Help" component={HelpScreen} />
                     </>
                 )}
             </Stack.Navigator>

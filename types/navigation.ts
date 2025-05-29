@@ -1,21 +1,23 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
-    SignUp: undefined;
     SignIn: undefined;
+    SignUp: undefined;
+    ForgotPassword: undefined;
     Home: undefined;
-    Schedule: undefined;
-    Report: undefined;
+    Profile: undefined;
+    Settings: undefined;
+    EditProfile: undefined;
+    NotificationFrequency: undefined;
+    Help: undefined;
+    ChangePassword: undefined;
+    LinkedDevices: undefined;
     SetupAccount: undefined;
     MainTabs: { screen?: string } | undefined;
     ProfileScreen: undefined;
-    Settings: undefined;
     ChangeUsername: undefined;
     ChangeAvatar: undefined;
     ManageAccess: undefined;
-    NotificationFrequency: undefined;
-    ChangePassword: undefined;
-    LinkedDevices: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

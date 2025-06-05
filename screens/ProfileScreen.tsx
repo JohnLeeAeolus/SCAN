@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -8,6 +8,7 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { updatePassword } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { ViewStyle, TextStyle, ImageStyle, ViewProps, TouchableOpacityProps } from 'react-native';
 
 const placeholderAvatar = 'https://ui-avatars.com/api/?name=User&background=7F5FFF&color=fff&size=128';
 
@@ -31,11 +32,23 @@ type Achievement = {
     desc: string;
 };
 
-export default function ProfileScreen() {
-    const [user, setUser] = useState<any>(null);
+type UserData = {
+    fullName?: string;
+    name?: string;
+    username?: string;
+    bio?: string;
+    profileImage?: string;
+    avatar?: string;
+    socialLinks?: SocialLink[];
+    achievements?: Achievement[];
+};
+
+type ProfileScreenProps = {};
+
+const ProfileScreen = ({ }: ProfileScreenProps) => {
+    const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [modalVisible, setModalVisible] = useState(false);
     const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
 
     const fetchUser = async () => {
@@ -113,7 +126,8 @@ export default function ProfileScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            // @ts-expect-error SafeAreaView type issue
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top']}>
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <ActivityIndicator size="large" color="#7F5FFF" />
                 </View>
@@ -122,7 +136,8 @@ export default function ProfileScreen() {
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        // @ts-expect-error SafeAreaView type issue
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['top']}>
             <ScrollView
                 contentContainerStyle={{ padding: 20 }}
                 showsVerticalScrollIndicator={false}
@@ -137,41 +152,22 @@ export default function ProfileScreen() {
             >
                 {/* Header Row */}
                 <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconBtn}>
+                    {/* @ts-expect-error TouchableOpacity type issue */}
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.headerIconBtn}
+                        activeOpacity={0.7}
+                    >
                         <Ionicons name="arrow-back-outline" size={24} color="#222" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Profile</Text>
-                    <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.headerIconBtn}>
-                        <Ionicons name="notifications-outline" size={24} color="#222" />
-                    </TouchableOpacity>
+                    <View style={styles.headerIconBtn} />
                 </View>
-                {/* Modal Menu */}
-                <Modal
-                    visible={modalVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setModalVisible(false)}
-                >
-                    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-                        <View style={styles.menuModal}>
-                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); }}>
-                                <Ionicons name="notifications-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                                <Text style={styles.menuText}>Notifications</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Dashboard'); }}>
-                                <Ionicons name="home-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                                <Text style={styles.menuText}>Go to Home</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.menuItem} onPress={() => { setModalVisible(false); navigation.navigate('Profile'); }}>
-                                <Ionicons name="settings-outline" size={20} color="#7F5FFF" style={{ marginRight: 10 }} />
-                                <Text style={styles.menuText}>Go to Settings</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </TouchableOpacity>
-                </Modal>
+
                 {/* Profile Card */}
                 <View style={styles.profileCard}>
-                    <TouchableOpacity>
+                    {/* @ts-expect-error TouchableOpacity type issue */}
+                    <TouchableOpacity activeOpacity={0.7}>
                         <Image
                             source={{ uri: user?.profileImage || user?.avatar || placeholderAvatar }}
                             style={styles.avatar}
@@ -182,38 +178,53 @@ export default function ProfileScreen() {
                     </View>
                     <Text style={styles.username}>@{user?.username || 'janedoe'}</Text>
                 </View>
-                {/* Bio Section */}
+
+                {/* Section Card */}
                 <View style={styles.sectionCard}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Bio</Text>
                     </View>
                     <Text style={styles.bioText}>{user?.bio || 'No bio added yet.'}</Text>
                 </View>
+
                 {/* Social Links */}
                 <Text style={styles.sectionTitle}>Social Links</Text>
                 <View style={styles.socialLinksRow}>
                     {user?.socialLinks?.map((link: SocialLink, idx: number) => (
                         <View key={idx} style={[styles.socialLink, { backgroundColor: link.color }]}>
-                            {getSocialLinkIcon(link.platform)}
-                            <Text style={styles.socialLabel}>{link.label}</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ marginRight: 6 }}>
+                                    {getSocialLinkIcon(link.platform)}
+                                </View>
+                                <Text style={styles.socialLabel}>{link.label}</Text>
+                            </View>
                         </View>
                     ))}
                 </View>
+
                 {/* Achievements */}
                 <Text style={styles.sectionTitle}>Achievements</Text>
-                {user?.achievements?.map((achievement: Achievement, idx: number) => (
-                    <View key={idx} style={styles.achievementCard}>
-                        {getAchievementIcon(achievement.icon)}
-                        <View style={{ marginLeft: 12 }}>
-                            <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                            <Text style={styles.achievementDesc}>{achievement.desc}</Text>
+                <View style={styles.achievementsRow}>
+                    {user?.achievements?.map((achievement: Achievement, idx: number) => (
+                        <View key={idx} style={styles.achievementCard}>
+                            <View style={{ marginRight: 12 }}>
+                                {getAchievementIcon(achievement.icon)}
+                            </View>
+                            <View style={{ marginLeft: 12 }}>
+                                <View style={{ marginBottom: 2 }}>
+                                    <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                                </View>
+                                <Text style={styles.achievementDesc}>{achievement.desc}</Text>
+                            </View>
                         </View>
-                    </View>
-                ))}
+                    ))}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
-}
+};
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
     headerRow: {
@@ -221,44 +232,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 18,
-    },
+    } as ViewStyle,
     headerTitle: {
         fontSize: 22,
         fontWeight: 'bold',
         color: '#222',
-    },
+    } as TextStyle,
     headerIconBtn: {
         padding: 4,
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.15)',
-        justifyContent: 'flex-start',
-        alignItems: 'flex-end',
-    },
-    menuModal: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        marginTop: 48,
-        marginRight: 16,
-        paddingVertical: 8,
-        width: 200,
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 4,
-    },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-    },
-    menuText: {
-        fontSize: 15,
-        color: '#222',
-    },
+        width: 32,
+    } as ViewStyle,
     profileCard: {
         backgroundColor: '#fff',
         borderRadius: 16,
@@ -270,30 +253,30 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 2 },
         elevation: 2,
-    },
+    } as ViewStyle,
     avatar: {
         width: 88,
         height: 88,
         borderRadius: 44,
         marginBottom: 12,
-    },
+    } as ImageStyle,
     name: {
         fontSize: 22,
         fontWeight: 'bold',
         color: '#222',
         marginBottom: 2,
-    },
+    } as TextStyle,
     username: {
         fontSize: 15,
         color: '#888',
         marginBottom: 10,
-    },
+    } as TextStyle,
     divider: {
         width: '100%',
         height: 1,
         backgroundColor: '#F0F0F0',
         marginVertical: 12,
-    },
+    } as ViewStyle,
     sectionCard: {
         backgroundColor: '#fff',
         borderRadius: 12,
@@ -304,29 +287,29 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
         elevation: 1,
-    },
+    } as ViewStyle,
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 6,
-    },
+    } as ViewStyle,
     sectionTitle: {
         fontSize: 16,
         fontWeight: 'bold',
         marginBottom: 8,
         color: '#222',
-    },
+    } as TextStyle,
     bioText: {
         color: '#444',
         fontSize: 15,
-    },
+    } as TextStyle,
     socialLinksRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
         marginBottom: 18,
-    },
+    } as ViewStyle,
     socialLink: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -335,12 +318,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         marginRight: 8,
         marginBottom: 8,
-    },
+    } as ViewStyle,
     socialLabel: {
         marginLeft: 6,
         fontSize: 14,
         color: '#222',
-    },
+    } as TextStyle,
     achievementCard: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -353,15 +336,21 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         shadowOffset: { width: 0, height: 1 },
         elevation: 1,
-    },
+    } as ViewStyle,
     achievementTitle: {
         fontWeight: 'bold',
         fontSize: 15,
         color: '#222',
-    },
+    } as TextStyle,
     achievementDesc: {
         color: '#888',
         fontSize: 13,
         marginTop: 2,
-    },
+    } as TextStyle,
+    achievementsRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 18,
+    } as ViewStyle,
 }); 

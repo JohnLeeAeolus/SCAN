@@ -22,7 +22,12 @@
         "resolveJsonModule": true,
         "skipLibCheck": true,
         "target": "esnext",
-        "module": "commonjs"
+        "module": "commonjs",
+        "types": [
+            "node",
+            "react",
+            "react-native"
+        ]
     },
     "include": [
         "**/*.ts",

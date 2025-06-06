@@ -9,12 +9,15 @@ import {
     ActivityIndicator,
     Linking,
     ScrollView,
+    Modal,
 } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { doc, setDoc, getFirestore } from 'firebase/firestore';
 
 type SignInScreenProps = {
     navigation: NativeStackNavigationProp<RootStackParamList, 'SignIn'>;
@@ -24,6 +27,13 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+    const [additionalInfo, setAdditionalInfo] = useState({
+        fullName: '',
+        phoneNumber: '',
+        address: '',
+    });
+    const [googleUser, setGoogleUser] = useState<any>(null);
 
     const initials = email
         ? email.split('@')[0].slice(0, 2).toUpperCase()
@@ -48,9 +58,64 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
         }
     };
 
-    // Placeholder handlers for social logins
-    const handleSocialLogin = (provider: string) => {
-        Alert.alert('Info', `Social login with ${provider} is not implemented yet.`);
+    const handleSocialLogin = async (provider: string) => {
+        if (provider === 'Google') {
+            try {
+                setLoading(true);
+                await GoogleSignin.configure({
+                    webClientId: 'YOUR_WEB_CLIENT_ID',
+                });
+
+                const userInfo = await GoogleSignin.signIn();
+                const { accessToken } = await GoogleSignin.getTokens();
+                const googleCredential = GoogleAuthProvider.credential(accessToken);
+                const userCredential = await signInWithCredential(auth, googleCredential);
+
+                // Store Google user info and show additional info form
+                setGoogleUser(userCredential.user);
+                setShowAdditionalInfo(true);
+                setAdditionalInfo(prev => ({
+                    ...prev,
+                    fullName: userCredential.user.displayName || '',
+                }));
+
+            } catch (error: any) {
+                console.error(error);
+                Alert.alert('Error', 'Failed to sign in with Google');
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
+    const handleSubmitAdditionalInfo = async () => {
+        if (!googleUser) return;
+
+        try {
+            setLoading(true);
+            const db = getFirestore();
+            const userRef = doc(db, 'users', googleUser.uid);
+
+            await setDoc(userRef, {
+                email: googleUser.email,
+                displayName: googleUser.displayName,
+                photoURL: googleUser.photoURL,
+                createdAt: new Date().toISOString(),
+                provider: 'google',
+                fullName: additionalInfo.fullName,
+                phoneNumber: additionalInfo.phoneNumber,
+                address: additionalInfo.address,
+                isProfileComplete: true
+            }, { merge: true });
+
+            setShowAdditionalInfo(false);
+            Alert.alert('Success', 'Profile completed successfully!');
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Failed to save additional information');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -101,17 +166,8 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
                         <Text style={styles.orText}>or</Text>
                         <View style={styles.divider} />
                     </View>
-                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Email')}>
-                        <Text style={styles.socialButtonText}>✉️  Continue with Email</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Apple')}>
-                        <Text style={styles.socialButtonText}>  Continue with Apple</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Youtube')}>
-                        <Text style={styles.socialButtonText}>▶️  Continue with Youtube</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Facebook')}>
-                        <Text style={styles.socialButtonText}>📘  Continue with Facebook</Text>
+                    <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialLogin('Google')}>
+                        <Text style={styles.socialButtonText}>🔍  Continue with Google</Text>
                     </TouchableOpacity>
                     <Text style={styles.signupText}>
                         Don't have an account?{' '}
@@ -121,6 +177,56 @@ export default function SignInScreen({ navigation }: SignInScreenProps) {
                     </Text>
                 </View>
             </ScrollView>
+
+            <Modal
+                visible={showAdditionalInfo}
+                animationType="slide"
+                transparent={true}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Complete Your Profile</Text>
+
+                        <Text style={styles.label}>Full Name</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={additionalInfo.fullName}
+                            onChangeText={(text) => setAdditionalInfo(prev => ({ ...prev, fullName: text }))}
+                            placeholder="Enter your full name"
+                        />
+
+                        <Text style={styles.label}>Phone Number</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={additionalInfo.phoneNumber}
+                            onChangeText={(text) => setAdditionalInfo(prev => ({ ...prev, phoneNumber: text }))}
+                            placeholder="Enter your phone number"
+                            keyboardType="phone-pad"
+                        />
+
+                        <Text style={styles.label}>Address</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={additionalInfo.address}
+                            onChangeText={(text) => setAdditionalInfo(prev => ({ ...prev, address: text }))}
+                            placeholder="Enter your address"
+                            multiline
+                        />
+
+                        <TouchableOpacity
+                            style={[styles.button, loading && styles.buttonDisabled]}
+                            onPress={handleSubmitAdditionalInfo}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.buttonText}>Complete Profile</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -233,5 +339,24 @@ const styles = StyleSheet.create({
     signupLink: {
         color: '#7F5FFF',
         fontWeight: 'bold',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 10,
+        width: '90%',
+        maxHeight: '80%',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
     },
 }); 
